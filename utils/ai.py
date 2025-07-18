@@ -7,10 +7,16 @@ import requests
 from io import BytesIO
 from urllib.parse import quote_plus
 import httpx
+import json
 
 genai.configure(api_key=GOOGLE_API_KEY)
 
-async def get_gemini_response(character: "Character", history: list[dict]) -> str:
+async def get_deepinfra_response(character: "Character", history: list[dict]) -> str:
+    """Get response from DeepInfra Mistral model"""
+    if not DEEPINFRA_API_KEY:
+        raise ValueError("DEEPINFRA_API_KEY is not set")
+    
+    # Build system prompt
     if character.description:
         system_prompt = f"Ты — {character.name}. {character.description}. Отвечай на русском языке."
     else:
@@ -28,31 +34,113 @@ async def get_gemini_response(character: "Character", history: list[dict]) -> st
             "Отвечай на русском языке."
         ]
         system_prompt = " ".join(prompt_parts)
-
-    model = genai.GenerativeModel(
-        'gemini-2.5-flash',
-        system_instruction=system_prompt
-    )
     
+    # If no history, return greeting
     if not history:
         return f"Привет! Я {character.name}. Рад с тобой пообщаться. Что скажешь?"
-
-    # The entire history is sent to the model now, let's format it all.
-    api_history = [
-        {"role": msg["role"], "parts": [{"text": msg["content"]}]}
-        for msg in history
-    ]
-
-    chat = model.start_chat(history=api_history[:-1]) # History is everything EXCEPT the last message
     
-    user_prompt = api_history[-1]['parts'][0]['text'] # The last message is the prompt
-
+    # Prepare messages for DeepInfra API
+    messages = [{"role": "system", "content": system_prompt}]
+    
+    # Add conversation history
+    for msg in history:
+        messages.append({
+            "role": msg["role"],
+            "content": msg["content"]
+        })
+    
+    # Make API request
+    url = "https://api.deepinfra.com/v1/openai/chat/completions"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {DEEPINFRA_API_KEY}"
+    }
+    
+    payload = {
+        "model": "mistralai/Mistral-Small-3.2-24B-Instruct-2506",
+        "messages": messages,
+        "temperature": 0.7,
+        "max_tokens": 1000
+    }
+    
     try:
-        response = await chat.send_message_async(user_prompt)
-        return response.text
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            
+            result = response.json()
+            if result.get("choices") and len(result["choices"]) > 0:
+                return result["choices"][0]["message"]["content"]
+            else:
+                return "К сожалению, не удалось получить ответ от AI. Попробуйте еще раз."
+                
+    except httpx.HTTPStatusError as e:
+        print(f"Error calling DeepInfra API: {e.response.status_code} {e.response.text}")
+        return "К сожалению, произошла ошибка при общении с AI. Попробуйте еще раз."
     except Exception as e:
-        print(f"Error calling Gemini API: {e}")
-        return "К сожалению, произошла ошибка при общении с AI. Попробуйте еще раз." 
+        print(f"Error calling DeepInfra API: {e}")
+        return "К сожалению, произошла ошибка при общении с AI. Попробуйте еще раз."
+
+async def get_gemini_response(character: "Character", history: list[dict]) -> str:
+    """Get response from Gemini or DeepInfra based on available API keys"""
+    
+    # Check which API to use - if Google API key is available, use Gemini; otherwise use DeepInfra
+    if GOOGLE_API_KEY:
+        # Use Gemini (existing code)
+        if character.description:
+            system_prompt = f"Ты — {character.name}. {character.description}. Отвечай на русском языке."
+        else:
+            # Construct a detailed prompt for constructor-based characters
+            prompt_parts = [
+                f"Ты — {character.name}, AI-персонаж.",
+                f"Твой архетип по MBTI: {character.archetype}.",
+                f"Стиль твоего общения: {character.communication_style}.",
+                f"Уровень твоего сарказма: {character.sarcasm_level} из 5.",
+                f"Уровень твоего юмора: {character.humor_level} из 5.",
+                f"Уровень твоего флирта: {character.flirt_level} из 5.",
+                f"Уровень твоей непредсказуемости: {character.unpredictability_level} из 5.",
+                f"Наличие черного юмора: {'да' if character.has_black_humor else 'нет'}.",
+                "Веди диалог строго в соответствии с этими чертами.",
+                "Отвечай на русском языке."
+            ]
+            system_prompt = " ".join(prompt_parts)
+
+        model = genai.GenerativeModel(
+            'gemini-2.5-flash',
+            system_instruction=system_prompt
+        )
+        
+        if not history:
+            return f"Привет! Я {character.name}. Рад с тобой пообщаться. Что скажешь?"
+
+        # The entire history is sent to the model now, let's format it all.
+        api_history = [
+            {"role": msg["role"], "parts": [{"text": msg["content"]}]}
+            for msg in history
+        ]
+
+        chat = model.start_chat(history=api_history[:-1]) # History is everything EXCEPT the last message
+        
+        user_prompt = api_history[-1]['parts'][0]['text'] # The last message is the prompt
+
+        try:
+            response = await chat.send_message_async(user_prompt)
+            return response.text
+        except Exception as e:
+            print(f"Error calling Gemini API: {e}")
+            return "К сожалению, произошла ошибка при общении с AI. Попробуйте еще раз."
+    
+    elif DEEPINFRA_API_KEY:
+        # Use DeepInfra as fallback
+        try:
+            return await get_deepinfra_response(character, history)
+        except Exception as e:
+            print(f"Error calling DeepInfra API: {e}")
+            return "К сожалению, произошла ошибка при общении с AI. Попробуйте еще раз."
+    
+    else:
+        # No API keys available
+        return "К сожалению, нет доступных API ключей для генерации ответов. Пожалуйста, настройте GOOGLE_API_KEY или DEEPINFRA_API_KEY."
 
 async def convert_voice_to_opus(voice_file: io.BytesIO) -> io.BytesIO:
     """Converts a voice file (likely in OGG format from Telegram) to OGG with OPUS codec."""

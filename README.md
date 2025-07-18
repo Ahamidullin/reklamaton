@@ -115,10 +115,10 @@ pip install -r requirements.txt
 # Telegram Bot API
 BOT_TOKEN=your_telegram_bot_token_here
 
-# Google APIs
+# Google APIs (опционально - для использования Gemini)
 GOOGLE_API_KEY=your_google_api_key_here
 
-# DeepInfra API (для генерации изображений)
+# DeepInfra API (для генерации изображений и/или текста)
 DEEPINFRA_API_KEY=your_deepinfra_api_key_here
 
 # База данных (опционально)
@@ -143,6 +143,12 @@ DB_URL=sqlite+aiosqlite:///reklamaton.db
 #### DeepInfra API Key:
 1. Зарегистрируйтесь на [DeepInfra](https://deepinfra.com/)
 2. Получите API ключ в профиле
+
+### ⚠️ Важно: Приоритет API ключей
+- Если задан `GOOGLE_API_KEY` → используется Google Gemini для генерации текста
+- Если `GOOGLE_API_KEY` не задан, но есть `DEEPINFRA_API_KEY` → используется DeepInfra Mistral для генерации текста
+- Для генерации изображений всегда используется DeepInfra (требует `DEEPINFRA_API_KEY`)
+- Необходим хотя бы один из ключей для корректной работы бота
 
 ### 5. Запуск бота
 ```bash
@@ -178,18 +184,29 @@ python bot.py
 
 ## 🔌 API и интеграции
 
+### LLM Integration (Google Gemini / DeepInfra)
+```python
+# Основная функция: get_gemini_response()
+# Автоматическое переключение между провайдерами:
+# - Если есть GOOGLE_API_KEY -> используется Google Gemini (gemini-2.5-flash)
+# - Если нет GOOGLE_API_KEY, но есть DEEPINFRA_API_KEY -> используется DeepInfra Mistral
+# - Если нет ни одного ключа -> показывается сообщение об ошибке
+```
+
 ### Google Gemini API
 ```python
-# Используется модель: gemini-2.5-flash
-# Функции: get_gemini_response()
+# Модель: gemini-2.5-flash
+# Функции: get_gemini_response() (при наличии GOOGLE_API_KEY)
 # Особенности: Динамическое создание system prompt на основе характеристик персонажа
 ```
 
 ### DeepInfra API
 ```python
-# Модель: black-forest-labs/FLUX-1-schnell
-# Функции: generate_image_with_deepinfra()
-# Параметры: 1024x1024, 25 inference steps
+# Текст: mistralai/Mistral-Small-3.2-24B-Instruct-2506
+# Изображения: black-forest-labs/FLUX-1-schnell
+# Функции: get_deepinfra_response(), generate_image_with_deepinfra()
+# Параметры изображений: 1024x1024, 25 inference steps
+# Параметры текста: temperature=0.7, max_tokens=1000
 ```
 
 ### Google Speech-to-Text
