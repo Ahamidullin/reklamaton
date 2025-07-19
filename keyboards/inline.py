@@ -22,10 +22,21 @@ def character_card_keyboard(character_id):
     buttons = [
         [InlineKeyboardButton(text="✅ Начать диалог", callback_data=f"start_dialogue_{character_id}")],
         [InlineKeyboardButton(text="✏️ Редактировать", callback_data=f"edit_character_{character_id}")],
+        [InlineKeyboardButton(text="🗑️ Удалить", callback_data=f"delete_character_{character_id}")],
         [InlineKeyboardButton(text="⬅️ Назад к списку", callback_data="select_character")]
     ]
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
     return keyboard 
+
+def confirm_delete_keyboard(character_id):
+    buttons = [
+        [
+            InlineKeyboardButton(text="✅ Да, удалить", callback_data=f"confirm_delete_{character_id}"),
+            InlineKeyboardButton(text="❌ Нет, отмена", callback_data=f"character_{character_id}")
+        ]
+    ]
+    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+    return keyboard
 
 def creation_method_keyboard():
     buttons = [
@@ -35,6 +46,13 @@ def creation_method_keyboard():
     ]
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
     return keyboard 
+
+def prompt_back_keyboard():
+    buttons = [
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_creation_method")]
+    ]
+    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+    return keyboard
 
 def skip_keyboard(callback_data: str):
     buttons = [
@@ -53,29 +71,56 @@ def preview_keyboard():
 
 def archetype_group_keyboard():
     buttons = [
-        [InlineKeyboardButton(text="Аналитики (INTJ, INTP, ENTJ, ENTP)", callback_data="archetype_group_analysts")],
-        [InlineKeyboardButton(text="Дипломаты (INFJ, INFP, ENFJ, ENFP)", callback_data="archetype_group_diplomats")],
-        [InlineKeyboardButton(text="Стражи (ISTJ, ISFJ, ESTJ, ESFJ)", callback_data="archetype_group_sentinels")],
-        [InlineKeyboardButton(text="Искатели (ISTP, ISFP, ESTP, ESFP)", callback_data="archetype_group_explorers")],
+        [InlineKeyboardButton(text="Аналитики (4 типа)", callback_data="archetype_group_analysts")],
+        [InlineKeyboardButton(text="Дипломаты (4 типа)", callback_data="archetype_group_diplomats")],
+        [InlineKeyboardButton(text="Стражи (4 типа)", callback_data="archetype_group_sentinels")],
+        [InlineKeyboardButton(text="Искатели (4 типа)", callback_data="archetype_group_explorers")],
         [InlineKeyboardButton(text="⬅️ Назад", callback_data="create_character")]
     ]
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
     return keyboard 
 
 def archetype_type_keyboard(types):
+    type_names_ru = {
+        "INTJ": "Архитектор",
+        "INTP": "Логик",
+        "ENTJ": "Командир",
+        "ENTP": "Полемист",
+        "INFJ": "Заступник",
+        "INFP": "Посредник",
+        "ENFJ": "Протагонист",
+        "ENFP": "Активист",
+        "ISTJ": "Логист",
+        "ISFJ": "Защитник",
+        "ESTJ": "Менеджер",
+        "ESFJ": "Консул",
+        "ISTP": "Виртуоз",
+        "ISFP": "Авантюрист",
+        "ESTP": "Предприниматель",
+        "ESFP": "Артист"
+    }
     buttons = []
     row = []
     for mbti_type in types:
-        row.append(InlineKeyboardButton(text=mbti_type, callback_data=f"archetype_type_{mbti_type}"))
+        display_name = type_names_ru.get(mbti_type) or mbti_type
+        row.append(InlineKeyboardButton(text=display_name, callback_data=f"archetype_type_{mbti_type}"))
         if len(row) == 2:
             buttons.append(row)
             row = []
     if row:
         buttons.append(row)
     
-    buttons.append([InlineKeyboardButton(text="⬅️ Назад", callback_data="creation_constructor")])
+    buttons.append([InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_archetype_group")])
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
     return keyboard 
+
+def confirm_archetype_keyboard(archetype_type: str):
+    buttons = [
+        [InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"confirm_archetype_{archetype_type}")],
+        [InlineKeyboardButton(text="⬅️ Назад к типам", callback_data="back_to_archetype_types")]
+    ]
+    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+    return keyboard
 
 def communication_style_keyboard():
     buttons = [
@@ -91,7 +136,7 @@ def communication_style_keyboard():
             InlineKeyboardButton(text="Сквернословие", callback_data="comm_style_profanity"),
             InlineKeyboardButton(text="Детский лепет", callback_data="comm_style_baby_talk")
         ],
-        [InlineKeyboardButton(text="⬅️ Назад", callback_data="creation_constructor")]
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_archetype_confirmation")]
     ]
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
     return keyboard 
@@ -117,7 +162,7 @@ def traits_keyboard(sarcasm=1, humor=1, flirt=1, unpredictability=1, black_humor
             InlineKeyboardButton(text="+", callback_data="trait_incr_flirt")
         ],
         [
-            InlineKeyboardButton(text="Непредсказуемость:", callback_data="noop"),
+            InlineKeyboardButton(text="Безумие:", callback_data="noop"),
             InlineKeyboardButton(text="-", callback_data="trait_decr_unpredictability"),
             InlineKeyboardButton(text=str(unpredictability), callback_data="noop"),
             InlineKeyboardButton(text="+", callback_data="trait_incr_unpredictability")
